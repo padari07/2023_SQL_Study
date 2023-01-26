@@ -1,0 +1,227 @@
+----------------------------------------------- 6강. 여러 개의 값에 대한 조작 -------------------------------------------------------
+
+
+---- lec6_1. 문자열 연결하기 ----
+
+--테이블 만들기 : 사용자의 주소 정보
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec6_1;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec6_1 (
+    user_id   string(255)
+  , pref_name string(255)
+  , city_name string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec6_1
+VALUES
+    ('U001', '서울특별시', '강서구')
+  , ('U002', '경기도수원시', '장안구'  )
+  , ('U003', '제주특별자치도', '서귀포시')
+;
+
+-- 1) 문자열 연결하기 : pref_name과 city_name을 합치기 ex)서울특별시강서구 등등
+select user_id, concat(pref_name, city_name) as pref_city
+from inlaid-lane-373607.sqlr202301.lec6_1;
+
+
+
+---- lec6_2. 하나의 레코드에 포함된 여러 개의 값 비교하기 ----
+
+-- 테이블 만들기 : 2015년부터 2017년까지의 4분기 매출 테이블
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec6_2;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec6_2 (
+    year integer
+  , q1   integer
+  , q2   integer
+  , q3   integer
+  , q4   integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec6_2
+VALUES
+    (2015, 82000, 83000, 78000, 83000)
+  , (2016, 85000, 85000, 80000, 81000)
+  , (2017, 92000, 81000, NULL , NULL )
+;
+
+-- 1) 분기별 매출 증감 판정하기
+select year, q1, q2
+, case when q1 < q2 then '+'
+when q1 = q2 then ''
+else '-'
+end as judge_q1_q2 -- q1과 q2의 매출 변화 평가
+, q2-q1 as diff_q1_q2 --q2와 q1의 매출 차이
+, sign(q2-q1) as sign_q2_q1 --sign함수를 사용해 q2와 q1의 매출 변화를 -1, 0, 1로 표현
+from inlaid-lane-373607.sqlr202301.lec6_2
+order by year;
+
+-- 2) 연간 최대/최소 4분기 매출 찾기
+select year, greatest(q1,q2,q3,q4) as greatest_sales, least(q1,q2,q3,q4) as least_sales
+from inlaid-lane-373607.sqlr202301.lec6_2
+order by year;
+
+-- 3) 연간 평균 4분기 매출 계산하기 
+-- :: 여기서 중요한 것은 null값을 어떻게 처리하는가임. 단순히 (q1+...q4)/4를 하게되면 null이 포함되면 그 값은 표시가 안됨 => coalesce함수 사용해서 null값을 0으로 변환해서 계산해야함.
+select year, (coalesce(q1,0)+coalesce(q2,0)+coalesce(q3,0)+coalesce(q4,0)) / 4 as average
+from inlaid-lane-373607.sqlr202301.lec6_2
+order by year;
+
+
+
+---- lec6_3. 2개의 값 비율 계산하기 ----
+
+-- 테이블 만들기: 광고 통계 정보 테이블(광고 노출 수와 클릭 수 집계)
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec6_3;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec6_3 (
+    dt          string(255)
+  , ad_id       string(255)
+  , impressions integer
+  , clicks      integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec6_3
+VALUES
+    ('2017-04-01', '001', 100000,  3000)
+  , ('2017-04-01', '002', 120000,  1200)
+  , ('2017-04-01', '003', 500000, 10000)
+  , ('2017-04-02', '001',      0,     0)
+  , ('2017-04-02', '002', 130000,  1400)
+  , ('2017-04-02', '003', 620000, 15000)
+;
+
+-- 1) 정수 자료형의 데이터 나누기
+-- :: 하루 데이터에서 각 광고의 클릭당 노출수(ctr, 클릭/노출수) 계산하기
+select dt, ad_id, clicks/impressions as ctr, clicks/impressions *100.0 as ctr_as_percent
+from inlaid-lane-373607.sqlr202301.lec6_3
+where dt='2017-04-01'
+order by dt, ad_id;
+
+-- 2) 0으로 나누는 것 피하기
+--:: 분모를 0으로 나누면 오류가 발생하게 되므로 이를 변경해주어야 함. 
+select dt, ad_id, case when impressions > 0 then clicks / impressions * 100.0 end as ctr_as_percent_by_case --방법1. impressions값이 0보다 크다면, 퍼센트로 계산하라.
+,(clicks / nullif(impressions,0)*100.0) as ctr_as_percent_by_null --방법2. nullif함수 사용하여, imprssions와 0이 같으면 null값 반환, 다르면 두번째 값 반환
+from inlaid-lane-373607.sqlr202301.lec6_3
+order by dt, ad_id;
+
+
+
+---- 6_4. 두 값의 거리 계산하기 ----
+
+-- 테이블 만들기 : 일차원 위치 정보 테이블(6-4-1), 이차원 위치 정보 테이블 (6-4-2)
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec6_4_1;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec6_4_1 (
+    x1 integer
+  , x2 integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec6_4_1
+VALUES
+    ( 5 , 10)
+  , (10 ,  5)
+  , (-2 ,  4)
+  , ( 3 ,  3)
+  , ( 0 ,  1)
+;
+
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec6_4_2;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec6_4_2(
+    x1 integer
+  , y1 integer
+  , x2 integer
+  , y2 integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec6_4_2
+VALUES
+    (0, 0, 2, 2)
+  , (3, 5, 1, 2)
+  , (5, 3, 2, 1)
+;
+
+-- 1) 숫자 데이터의 절댓값, 제곱 평균 제곱근(rms) 계산하기
+select abs(x1 - x2) as abs, sqrt(power(x1-x2, 2)) as rms --제곱 평균 제곱근에서, 제곱을 할 때 사용되는 power함수, 그리고 제곱근을 구할때 사용되는 sqrt함수를 모두 사용합니다.
+from inlaid-lane-373607.sqlr202301.lec6_4_1;
+
+-- 2) 이차원 위치정보에서, xy평면 위에 있는 두 점의 유클리드 거리 계산 - (x1,y1) 그리고 (x2,y2) 간의 거리 구하기
+--:: 유클리드 거리란, 물리적인 공간에서 거리를 구할 때 사용되는 방법으로, 제곱 평균 제곱근을 사용해 구합니다.
+select sqrt(power(x1-x2, 2)+power(y1-y2, 2)) as dist
+from inlaid-lane-373607.sqlr202301.lec6_4_2;
+
+
+
+---- lec6_5. 날짜/시간 계산하기 ----
+
+--테이블 만들기 : 서비스 사용자 등록 시간과 생일 정보를 포함하는 사용자 마스터 테이블
+
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec6_5;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec6_5 (
+    user_id        string(255)
+  , register_stamp string(255)
+  , birth_date     string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec6_5
+VALUES
+    ('U001', '2016-02-28 10:00:00', '2000-02-29')
+  , ('U002', '2016-02-29 10:00:00', '2000-02-29')
+  , ('U003', '2016-03-01 10:00:00', '2000-02-29')
+;
+
+-- 1) 미래 또는 과거의 날짜/시간을 계산하는 쿼리
+select user_id, timestamp(register_stamp) as register_stamp  -- 등록일시를 출력
+, timestamp_add(timestamp(register_stamp), interval 1 hour) as after_1_hour -- timestamp_add함수를 사용하여 등록일시로부터 1시간 후(interval 1 hour)의 일시를 출력
+, timestamp_sub(timestamp(register_stamp), interval 30 minute) as before_30_minutes -- timestamp_sub함수를 사용하여 등록일시로부터 30분 전(interval 30 minute)의 일시를 출력
+, date(timestamp(register_stamp)) as register_date -- 날짜 계산의 경우, 타임스탬프 문자열을 기반으로는 직접할 수 없으므로, date함수를 사용하여 날짜/시간 유형으로 변경한 후 계산.
+, date_add(date(timestamp(register_stamp)), interval 1 day) as after_1_day -- 날짜/시간유형으로 변경한 후, 등록일시로부터 1일 후의 날짜를 반환
+, date_sub(date(timestamp(register_stamp)), interval 1 month) as before_1_month -- 날짜/시간유형으로 변경한 후 , 등록일시로부터 1개월 후의 날짜로 반환
+from inlaid-lane-373607.sqlr202301.lec6_5;
+
+-- 2) 날짜 데이터들의 차이 계산하기
+select user_id, current_date as today --유저 id와 현재 날짜를 출력
+, date(timestamp(register_stamp)) as register_date -- 등록일시(string문자유형을 date날짜유형으로 변경)를 출력
+, date_diff(current_date(), date(timestamp(register_stamp)),day) as diff_days --현재 날짜와 등록일시의 일수 차이를 계산.
+, date_diff(current_date(), date(timestamp(register_stamp)),year) as diff_years --현재 날짜와 등록일시의 연도 차이를 계산.
+from inlaid-lane-373607.sqlr202301.lec6_5;
+
+
+-- 3) 사용자의 생년월일로 나이 계산하기 :: 연 부분 차이 계산하기
+-- 전용 함수를 이용해 계산하는 방법
+select user_id, current_date as today
+, date(timestamp(register_stamp)) as register_date
+, date(timestamp(birth_date)) as birth_date
+, date_diff(current_date, date(timestamp(birth_date)),year) as current_age
+, date_diff(date(timestamp(register_stamp)),date(timestamp(birth_date)),year) as register_age
+from inlaid-lane-373607.sqlr202301.lec6_5;
+
+-- 날짜를 정수로 표현해서 나이를 계산하기
+select floor((20160228 - 20000229)/10000) as age; --전용 함수를 사용하지 않고, 정수로 바꾸어서 날짜를 계산. floor함수를 사용해 내림하였음.
+
+-- 등록 시점과 현재 시점의 나이를 문자열로 계산하기
+
+
+
+---- lec6_6. ip주소 다루기 ----
+
+-- 1) 정수 또는 문자열로 ip주소 다루기
+select ip
+, cast(split(ip, '.')[safe_ordinal(1)] as int64) as ip_part_1
+, cast(split(ip, '.')[safe_ordinal(2)] as int64) as ip_part_2
+, cast(split(ip, '.')[safe_ordinal(3)] as int64) as ip_part_3
+, cast(split(ip, '.')[safe_ordinal(4)] as int64) as ip_part_4
+from (select '223.39.200.67' as ip) as t; 
+
+-- 2) ip 주소를 정수 자료형 표기로 변환하기 (ip주소의 대소비교, 범위판정 등 가능)
+select ip
+, cast(split(ip, '.')[safe_ordinal(1)] as int64) * pow(2,24) -- safe_ordinal(1)함수를 사용해 ip주소의 첫번째 파트를 선택하고, 그 파트에 대해 pow함수를 사용해 2의 24승만큼 곱함.
++ cast(split(ip, '.')[safe_ordinal(2)] as int64) * pow(2,16)
++ cast(split(ip, '.')[safe_ordinal(3)] as int64) * pow(2,8)
++ cast(split(ip, '.')[safe_ordinal(4)] as int64) * pow(2,0) as ip_integer
+from (select '223.39.200.67' as ip) as t; 
+
+-- 3) ip주소를 0으로 메우기 (ip주소를 비교할 수 있는 또 다른 방법은 10진수 부분을 3자리 숫자가 되게 앞 부분을 0으로 메워서 문자열로 만드는 것. 모든 파트의 자릿수를 3자리로 만들기)
+select ip
+, concat(
+  lpad(split(ip, '.')[safe_ordinal(1)], 3, '0') -- ip의 첫번째 '.'을 기준으로 각 10진수를 0으로 왼쪽방향에서 메워서 고정 길이 문자열로 만듦으로써 대소비교 등 할 수 있음.
+, lpad(split(ip, '.')[safe_ordinal(2)], 3, '0')
+, lpad(split(ip, '.')[safe_ordinal(3)], 3, '0')
+, lpad(split(ip, '.')[safe_ordinal(4)], 3, '0')) as ip_padding
+from (select '223.39.200.67' as ip) as t; 
