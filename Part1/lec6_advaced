@@ -1,0 +1,70 @@
+----본 내용은 google big query 를 기준으로 작성된 쿼리입니다. ----
+
+---- lecture6 응용하기 ----
+select*from inlaid-lane-373607.sqlr202301.lec6_adv; --테이블 확인하기
+
+-- 응용1) 지역명(place)과 지점명(markname)을 합치기
+select code, concat(place, markname) as market_place
+from inlaid-lane-373607.sqlr202301.lec6_adv;
+
+-- 응용2) 2021년 대비 2022년의 매출 증감 표시하기
+select code, place, markname, case when sales_2022>sales_2021 then '+' when sales_2022<sales_2021 then '-' else '' end as judge
+, sales_2022 - sales_2021 as diff_judge
+, sign(sales_2022-sales_2021) as sign
+from inlaid-lane-373607.sqlr202301.lec6_adv;
+
+
+-- 응용3) 지점별 4년간 최대/최소 매출을 찾기
+select code, concat(place,markname) as market_name, greatest(sales_2019, sales_2020, sales_2021, sales_2022) as greatest_sale, least(sales_2019, sales_2020, sales_2021, sales_2022) as least_sale
+from inlaid-lane-373607.sqlr202301.lec6_adv;
+
+
+-- 응용4) 연합계 및 연평균 매출 계산하기
+select concat(place,markname) as market_name, sales_2019 + sales_2020 + sales_2021 + sales_2022 as total_sales
+from inlaid-lane-373607.sqlr202301.lec6_adv
+order by total_sales desc; --연합계 매출
+
+select concat(place,markname) as market_name, (sales_2019 + sales_2020 + sales_2021 + sales_2022)/4 as avg_sales
+from inlaid-lane-373607.sqlr202301.lec6_adv
+order by avg_sales desc;  --연평균 매출
+
+select concat(place,markname) as market_name, (sales_2021 + sales_2022)/2 as avg_sales_2years
+from inlaid-lane-373607.sqlr202301.lec6_adv
+order by avg_sales_2years desc;  --최근 2년 연평균 매출
+
+
+-- 응용5) 등록날짜와 현재날짜의 차이 계산하기
+select concat(place,markname) as market_name
+, current_date() as today
+, date(timestamp(regdate)) as register_date
+, date_diff(current_date(), date(timestamp(regdate)), day) as diff_days
+from inlaid-lane-373607.sqlr202301.lec6_adv;
+
+
+-- 응용6) 등록날짜로 등록년수 계산하기
+select concat(place,markname) as market_name
+, current_date as today
+, date(regdate) as register_date
+, date_diff(current_date(), date(regdate), year) as year
+from inlaid-lane-373607.sqlr202301.lec6_adv;
+
+
+-- 응용7) ip주소를 정수형으로 변환하기
+select concat(place,markname) as market_name, ip
+, cast(split(ip, '.')[safe_ordinal(1)] as int64) * pow(2,24) 
+-- split함수를 사용해, ip칼럼의 문자열을 .을 기준으로 나누고, cast함수를 사용해 첫 번째에 해당하는 부분을 int64데이터타입으로 변환한다. 이후 pow함수를 사용해 앞의 숫자와 2^24만큼 곱한다.
++ cast(split(ip, '.')[safe_ordinal(2)] as int64) * pow(2,16)
++ cast(split(ip, '.')[safe_ordinal(3)] as int64) * pow(2,8)
++ cast(split(ip, '.')[safe_ordinal(4)] as int64) * pow(2,0) as ip_integer
+from inlaid-lane-373607.sqlr202301.lec6_adv;
+
+
+-- 응용8) ip주소를 0으로 메우기
+select concat(place,markname) as market_name, ip
+, concat(
+  lpad(split(ip, '.')[safe_ordinal(1)], 3, '0') 
+  -- split함수를 사용해 ip칼럼의 문자열을 '.'기준으로 나누고(배열분해), lpad함수를 사용해 첫번째 .까지의 주소를 왼쪽부터 3자리의 0으로 매운다. 
+, lpad(split(ip, '.')[safe_ordinal(2)], 3, '0')
+, lpad(split(ip, '.')[safe_ordinal(3)], 3, '0')
+, lpad(split(ip, '.')[safe_ordinal(4)], 3, '0')) as ip_padding
+from inlaid-lane-373607.sqlr202301.lec6_adv;
