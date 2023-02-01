@@ -1,0 +1,53 @@
+---- lec7 응용 ----
+select * from inlaid-lane-373607.sqlr202301.lec7_adv;
+
+select id, round((korean + english + math)/3,1) as score
+from inlaid-lane-373607.sqlr202301.lec7_adv;
+
+alter table inlaid-lane-373607.sqlr202301.lec7_adv add column score int64; -- 칼럼 생성
+alter table inlaid-lane-373607.sqlr202301.lec7_adv ALTER COLUMN score set DATA TYPE float64; --칼럼 데이터 타입 변경
+
+update inlaid-lane-373607.sqlr202301.lec7_adv set score = round((korean + english + math)/3,1) where score is null; -- 칼럼 안에 score 평균 데이터 값 넣기
+
+
+--1) order by구문으로 순서 정의하기
+select id, score, row_number() over (order by score desc) as row
+, rank() over (order by score desc) as rank
+, dense_rank() over (order by score desc) as dense_rank
+from inlaid-lane-373607.sqlr202301.lec7_adv
+order by row;
+
+
+--2) lead()와 lag()로 행의 값 추출하기
+select id, score
+, row_number() over (order by score desc) as row
+, lead(score, 2) over(order by score desc) as lead
+, lag(score, 2) over(order by score desc) as lag
+from inlaid-lane-373607.sqlr202301.lec7_adv
+order by row;
+
+--3) rows between start and end 구문 예제
+select id, score
+, row_number() over (order by score desc) as row
+-- 행을 기준으로, 첫 번째 행부터 현재 행까지의 누적합계 구하기
+, round(sum(score) over(order by score desc rows between unbounded preceding and current row),1) as sum_score
+
+-- 현재 행과 앞의 행을 기준으로의 평균 점수 구하기
+, round(avg(score) over(order by score desc rows between 1 preceding and 1 following),1) as avg3_score
+from inlaid-lane-373607.sqlr202301.lec7_adv
+order by row;
+
+
+--4) 평균점수가 가장 높은 / 가장 낮은 학생 추출하기
+select id, score,
+first_value(id) over(order by score desc rows between unbounded preceding and unbounded following) as first
+, last_value(id) over(order by score desc rows between unbounded preceding and unbounded following) as last
+from inlaid-lane-373607.sqlr202301.lec7_adv
+order by score desc;
+
+
+--5) 윈도우 함수의 PARTITION BY구문과 ORDER BY절 조합하기
+select id, class, score,
+dense_rank() over(partition by class order by score desc) as dense_score
+from inlaid-lane-373607.sqlr202301.lec7_adv
+order by class, score desc;
