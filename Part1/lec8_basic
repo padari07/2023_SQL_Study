@@ -1,0 +1,153 @@
+----------------------------------------------- 8강. 여러 개의 테이블에 대한 조작 -------------------------------------------------------
+
+
+---- lec8_1. 여러개의 테이블의 결합 ----
+
+--테이블 만들기 : 사용자 마스터 테이블
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_1_1;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_1_1 (
+    user_id string(255)
+  , name    string(255)
+  , email   string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_1_1
+VALUES
+    ('U001', 'Sato'  , 'sato@example.com'  )
+  , ('U002', 'Suzuki', 'suzuki@example.com')
+;
+
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_1_2;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_1_2 (
+    user_id string(255)
+  , name    string(255)
+  , phone   string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_1_2
+VALUES
+    ('U001', 'Ito'   , '080-xxxx-xxxx')
+  , ('U002', 'Tanaka', '070-xxxx-xxxx')
+;
+
+
+--1) 여러개의 테이블을 세로로 결합하기 (union all)
+select 'app1' as app_name, user_id, name, email from inlaid-lane-373607.sqlr202301.lec8_1_1
+union all
+select 'app2' as app_name, user_id, name, NULL as email from inlaid-lane-373607.sqlr202301.lec8_1_2;
+
+
+
+---- lec8_2. 여러 개의 테이블을 가로로 정렬하기 (join) ----
+--테이블 만들기
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_2_1;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_2_1 (
+    category_id integer
+  , name        string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_2_1
+VALUES
+    (1, 'dvd' )
+  , (2, 'cd'  )
+  , (3, 'book')
+;
+
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_2_2;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_2_2 (
+    category_id integer
+  , sales       integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_2_2
+VALUES
+    (1, 850000)
+  , (2, 500000)
+;
+
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_2_3;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_2_3 (
+    category_id integer
+  , rank        integer
+  , product_id  string(255)
+  , sales       integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_2_3
+VALUES
+    (1, 1, 'D001', 50000)
+  , (1, 2, 'D002', 20000)
+  , (1, 3, 'D003', 10000)
+  , (2, 1, 'C001', 30000)
+  , (2, 2, 'C002', 20000)
+  , (2, 3, 'C003', 10000)
+;
+
+select * from sqlr202301.lec8_2_1
+order by category_id;
+select * from sqlr202301.lec8_2_2
+order by category_id;
+
+--1) left join을 활용한 테이블 칼럼 결합 (마스터 테이블의 행 수를 변경하지 않음)
+select p.category_id, p.name, q.sales, r.product_id as top_product
+from inlaid-lane-373607.sqlr202301.lec8_2_1 as p
+left join
+inlaid-lane-373607.sqlr202301.lec8_2_2 as q
+on p.category_id = q.category_id
+left join
+inlaid-lane-373607.sqlr202301.lec8_2_3 as r
+on p.category_id = r.category_id and r.rank=1
+order by p.category_id;
+
+--2) 상관서브쿼리를 활용한 테이블 칼럼 결합 (지원되지 않는 쿼리)
+select p.category_id, p.name, 
+(select q.sales from inlaid-lane-373607.sqlr202301.lec8_2_2 as q
+ where p.category_id = q.category_id) as sales,
+(select r.product_id from inlaid-lane-373607.sqlr202301.lec8_2_3 as r
+ where p.category_id = r.category_id 
+ order by sales desc limit 1) as top_product
+ from inlaid-lane-373607.sqlr202301.lec8_2_1 as p;
+
+
+
+---- lec8_3. 조건 플래그를 0과 1로 표시하기 ----
+--테이블 만들기
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_3_1;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_3_1(
+    user_id     string(255)
+  , card_number string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_3_1
+VALUES
+    ('U001', '1234-xxxx-xxxx-xxxx')
+  , ('U002', NULL                 )
+  , ('U003', '5678-xxxx-xxxx-xxxx')
+;
+
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_3_2;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_3_2 (
+    purchase_id integer
+  , user_id     string(255)
+  , amount      integer
+  , stamp       string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_3_2
+VALUES
+    (10001, 'U001', 200, '2017-01-30 10:00:00')
+  , (10002, 'U001', 500, '2017-02-10 10:00:00')
+  , (10003, 'U001', 200, '2017-02-12 10:00:00')
+  , (10004, 'U002', 800, '2017-03-01 10:00:00')
+  , (10005, 'U002', 400, '2017-03-02 10:00:00')
+;
+
+--1) 신용 카드 등록과 구매 이력 유무를 0과 1로 나타내기
+select p.user_id, p.card_number,
+count(q.user_id), 
+case when p.card_number is not null then 1 else 0 end as card,
+sign(count(q.user_id)) as purchased
+from inlaid-lane-373607.sqlr202301.lec8_3_1 as p
+left join inlaid-lane-373607.sqlr202301.lec8_3_2 as q
+on p.user_id = q.user_id
+group by p.user_id, p.card_number;
