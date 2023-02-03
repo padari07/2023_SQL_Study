@@ -151,3 +151,111 @@ from inlaid-lane-373607.sqlr202301.lec8_3_1 as p
 left join inlaid-lane-373607.sqlr202301.lec8_3_2 as q
 on p.user_id = q.user_id
 group by p.user_id, p.card_number;
+
+
+---- lec8_4. 계산한 테이블에 이름 붙여 재사용하기 ----
+--테이블 만들기 : 카테고리별 상품 매출 테이블
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec8_4;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec8_4 (
+    category_name string(255)
+  , product_id    string(255)
+  , sales         integer
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec8_4
+VALUES
+    ('dvd' , 'D001', 50000)
+  , ('dvd' , 'D002', 20000)
+  , ('dvd' , 'D003', 10000)
+  , ('cd'  , 'C001', 30000)
+  , ('cd'  , 'C002', 20000)
+  , ('cd'  , 'C003', 10000)
+  , ('book', 'B001', 20000)
+  , ('book', 'B002', 15000)
+  , ('book', 'B003', 10000)
+  , ('book', 'B004',  5000)
+;
+
+SELECT * FROM inlaid-lane-373607.sqlr202301.lec8_4;
+
+--1) 카테고리별 순위를 추가한 테이블에 이름 붙이기
+with product_rank as (
+  select category_name, product_id, sales,
+  row_number() over(partition by category_name order by sales desc) as rank
+  from inlaid-lane-373607.sqlr202301.lec8_4
+)
+select * from product_rank;
+
+--2) 유니크한 순위 목록만을 나타내기
+with product_rank as (
+  select category_name, product_id, sales,
+  row_number() over(partition by category_name order by sales desc) as rank
+  from inlaid-lane-373607.sqlr202301.lec8_4
+)
+, rank_only as (select distinct rank from product_rank)
+select * from rank_only
+order by rank;
+
+--3) 카테고리들의 순위를 횡단적으로 출력하기
+with product_rank as (select category_name, product_id, sales,
+  row_number() over(partition by category_name order by sales desc) as rank
+  from inlaid-lane-373607.sqlr202301.lec8_4),
+  rank_only as (select distinct rank from product_rank)
+
+select r.rank,
+p1.product_id as dvd,
+p1.sales as dvd_sales,
+p2.product_id as cd,
+p2.sales as cd_sales,
+p3.product_id as book,
+p3.sales as book_sales
+
+from rank_only as r 
+left join product_rank as p1
+on r.rank = p1.rank
+and p1.category_name = 'dvd'
+
+left join product_rank as p2
+on r.rank = p2.rank
+and p2.category_name = 'cd'
+
+left join product_rank as p3
+on r.rank = p3.rank
+and p3.category_name = 'book'
+
+order by r.rank;
+
+
+---- lec8_5. 유사 테이블 만들기 ----
+-- 유사 테이블이란, 일시적인 테이블로써, 이름을 붙여 사용할 수 있는 테이블이다.
+-- 공통 테이블 식을 사용한다. (with구문)
+
+with mst_devices as(
+  select 1 as device_id, 'pc' as device_name
+  union all
+  select 2 as device_id, 'sp' as device_name
+  union all
+  select 3 as device_id, 'app' as device_name 
+)
+select * from mst_devices;
+
+--2) 테이블을 생성하지 않고 가상의 테이블을 생성해 코드를 레이블로 변환하기
+with mst_devices as(
+  select 1 as device_id, 'pc' as device_name
+  union all
+  select 2 as device_id, 'sp' as device_name
+  union all
+  select 3 as device_id, 'app' as device_name 
+)
+select u.user_id, d.device_name
+from inlaid-lane-373607.sqlr202301.lec5_1 as u
+left join
+mst_devices as d
+on
+u.register_device = d.device_id;
+
+--3) 순번을 가진 유사 테이블 작성하기
+with series as(
+  select idx from unnest(generate_array(1,5)) as idx
+)
+select * from series;
