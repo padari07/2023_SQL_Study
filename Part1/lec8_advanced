@@ -1,0 +1,93 @@
+----- lec8 응용 ----
+
+-- 1) UNION ALL 구문
+CREATE TABLE inlaid-lane-373607.sqlr202301.p2021 (
+  user_id string(255),
+  purchase_date date,
+  product_id string(255),
+  price integer
+);
+
+insert into inlaid-lane-373607.sqlr202301.p2021 values 
+  ('A001', '2021-04-01','ICE01', 2000),
+  ('A002', '2021-07-07','ICE02', 3000),
+  ('B001', '2021-09-09','BLACK03', 5000)
+;
+
+SELECT * FROM  inlaid-lane-373607.sqlr202301.p2021;
+
+CREATE TABLE inlaid-lane-373607.sqlr202301.p2022 (
+  user_id string(255),
+  purchase_date date,
+  product_id string(255),
+  price integer
+);
+
+insert into inlaid-lane-373607.sqlr202301.p2022 values 
+  ('A003', '2022-02-07', 'BLACK02', 7000),
+  ('B001', '2022-05-22', 'ICE01', 2000),
+  ('B002', '2022-08-14', 'BLACK04', 9000)
+;
+
+SELECT * FROM  inlaid-lane-373607.sqlr202301.p2022;
+
+SELECT user_id, purchase_date, product_id, price, 2021 as year from inlaid-lane-373607.sqlr202301.p2021
+union all
+select user_id, purchase_date, product_id, price, 2022 as year from inlaid-lane-373607.sqlr202301.p2022
+order by purchase_date;
+
+
+--2) join
+CREATE TABLE inlaid-lane-373607.sqlr202301.category (
+  category_id integer,
+  category_name string,
+);
+
+insert into inlaid-lane-373607.sqlr202301.category values 
+  (1, 'action'),
+  (2, 'drama'),
+  (3, 'sf')
+  ;
+  
+CREATE TABLE inlaid-lane-373607.sqlr202301.movie (
+  category_id integer,
+  movie_name string,
+  audience integer
+);
+
+insert into inlaid-lane-373607.sqlr202301.movie values 
+  (2, 'soccers', 370000),
+  (3, 'underwater', 176000)
+  ;
+
+select * from inlaid-lane-373607.sqlr202301.category
+order by category_id;
+
+select * from inlaid-lane-373607.sqlr202301.movie
+order by category_id;
+
+select c.category_id, c.category_name, m.movie_name, m.audience
+from inlaid-lane-373607.sqlr202301.category as c
+FULL OUTER JOIN
+inlaid-lane-373607.sqlr202301.movie as m
+on c.category_id = m.category_id;
+
+select c.category_id, c.category_name, m.movie_name, m.audience
+from inlaid-lane-373607.sqlr202301.movie as m
+RIGHT join
+inlaid-lane-373607.sqlr202301.category as c
+on m.category_id = c.category_id;
+
+
+with busan_subway as(
+  select '다대포헤수욕장' as name, '1' as line_number, '101' as sta_number
+  union all
+  select '다대포향' as name, '1' as line_number, '102' as sta_number
+  union all
+  select '낫개' as name, '1' as line_number,'103' as sta_number
+  union all
+  select '장산' as name, '2' as line_number, '201' as sta_number
+  union all
+   select '중동' as name, '2' as line_number, '202' as sta_number
+)
+select * from busan_subway;
