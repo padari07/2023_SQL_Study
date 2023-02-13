@@ -1,0 +1,41 @@
+----------- lec 9 응용 ------------
+select * from inlaid-lane-373607.sqlr202301.9_z_chart;
+
+--1) dt칼럼을 연월일로 분리하기 (dt칼럼이 date타입이므로, string타입으로 변환한 후 분리하여야 함.)
+with daily_price as (
+  select dt
+  , substr(cast(dt as string), 1, 4) as year
+  , substr(cast(dt as string), 6, 2) as month
+  , substr(cast(dt as string), 9, 2) as date
+  , sum(price) as tot_price
+  , count(id) as order_count
+  from inlaid-lane-373607.sqlr202301.9_z_chart
+  group by dt
+)
+--2) daliy_price 임시 테이블을 활용하여 2021년과 2022년의 월별 매출 (월차매출) 구하기
+, monthly_amount as (
+  select year, 
+  month,
+  sum(tot_price) as amount
+  from daily_price
+  group by year, month
+ )
+--3) monthly_amount 임시 테이블을 활용하여 2022년의 매출누계 구하기 
+, calc as (
+  select year, month, amount,
+  sum(case when year = '2022' then amount end)
+  over (order by year, month rows unbounded preceding) as agg_amount
+ --4) monthly_amount 임시 테이블을 활용하여 이전 1년간(현재 달부터 11개월전까지)의 이동년계 구하기 
+  ,sum(amount)
+  over(order by year, month rows between 11 preceding and current row) as moving_amount
+  from monthly_amount
+  order by year, month
+  )
+--5) 2022년 데이터만 출력하기
+select concat(year, '-', month) as year_month
+, amount
+, agg_amount
+, moving_amount
+from calc
+where year='2022'
+order by year_month;
