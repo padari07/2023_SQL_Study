@@ -1,0 +1,136 @@
+
+
+--------- lec10 다면적인 축을 사용해 데이터 집약하기 --------------------
+
+--1) 카테고리별 매출과 소계 계산하기
+--테이블 만들기
+DROP TABLE IF EXISTS inlaid-lane-373607.sqlr202301.lec10_1;
+CREATE TABLE inlaid-lane-373607.sqlr202301.lec10_1(
+    dt           string(255)
+  , order_id     integer
+  , user_id      string(255)
+  , item_id      string(255)
+  , price        integer
+  , category     string(255)
+  , sub_category string(255)
+);
+
+INSERT INTO inlaid-lane-373607.sqlr202301.lec10_1
+VALUES
+    ('2017-01-18', 48291, 'usr33395', 'lad533', 37300,  'ladys_fashion', 'bag')
+  , ('2017-01-18', 48291, 'usr33395', 'lad329', 97300,  'ladys_fashion', 'jacket')
+  , ('2017-01-18', 48291, 'usr33395', 'lad102', 114600, 'ladys_fashion', 'jacket')
+  , ('2017-01-18', 48291, 'usr33395', 'lad886', 33300,  'ladys_fashion', 'bag')
+  , ('2017-01-18', 48292, 'usr52832', 'dvd871', 32800,  'dvd'          , 'documentary')
+  , ('2017-01-18', 48292, 'usr52832', 'gam167', 26000,  'game'         , 'accessories')
+  , ('2017-01-18', 48292, 'usr52832', 'lad289', 57300,  'ladys_fashion', 'bag')
+  , ('2017-01-18', 48293, 'usr28891', 'out977', 28600,  'outdoor'      , 'camp')
+  , ('2017-01-18', 48293, 'usr28891', 'boo256', 22500,  'book'         , 'business')
+  , ('2017-01-18', 48293, 'usr28891', 'lad125', 61500,  'ladys_fashion', 'jacket')
+  , ('2017-01-18', 48294, 'usr33604', 'mem233', 116300, 'mens_fashion' , 'jacket')
+  , ('2017-01-18', 48294, 'usr33604', 'cd477' , 25800,  'cd'           , 'classic')
+  , ('2017-01-18', 48294, 'usr33604', 'boo468', 31000,  'book'         , 'business')
+  , ('2017-01-18', 48294, 'usr33604', 'foo402', 48700,  'food'         , 'meats')
+  , ('2017-01-18', 48295, 'usr38013', 'foo134', 32000,  'food'         , 'fish')
+  , ('2017-01-18', 48295, 'usr38013', 'lad147', 96100,  'ladys_fashion', 'jacket')
+ ;
+
+-- 1) 소카테고리의 매출 구하기 --
+with sub_category_amount as ( --with구문을 활용해 임시테이블 만들기
+  select 
+  category as category, --물리테이블에서 category칼럼 뽑아오기
+  sub_category as sub_category, --물리테이블에서 sub_category칼럼 뽑아오기
+  sum(price) as amount -- 물리테이블에서 가격의 합계 뽑아오기
+  from inlaid-lane-373607.sqlr202301.lec10_1 --데이터를 추출할 물리테이블 지정
+  group by category, sub_category -- 대분류별로 묶은 다음, 소분류별로 묶기. 
+)
+-- 2) 대카테고리의 매출 구하기
+, category_amount as ( --with구문을 사용해 categoty_amount라는 임시테이블 만들기
+  select
+  category, --물리테이블에서 category칼럼 추출
+  'all' as sub_category, -- sub_category(소분류)칼럼의 데이터 값을 'all'로 지정함
+  sum(price) as amount -- price의 합계
+  from inlaid-lane-373607.sqlr202301.lec10_1 --데이터를 추출할 물리테이블 지정
+  group by category -- 대분류별로 묶음
+)
+-- 3) 전체 매출 구하기
+, total_amount as (
+  select
+  'all' as category, -- category(대분류)칼럼의 데이터 값을 'all' 로 지정함
+  'all' as sub_category -- sub_category(소분류)칼럼의 데이터 값을 'all'로 지정함.
+  ,sum(price) as amount -- price칼럼의 합계를 구함. 그것의 별칭은 amount로 지정함.
+  from inlaid-lane-373607.sqlr202301.lec10_1 --데이터를 추출할 물리테이블 지정
+)
+-- 4) 테이블 합치기
+select category, sub_category, amount from sub_category_amount
+union all
+select category, sub_category, amount from category_amount
+union all
+select category, sub_category, amount from total_amount;
+
+
+
+
+--- 2) ABC분석
+--1) 항목별 매출 합계 계산
+with
+monthly_sales as (
+  select
+  category, -- 카테고리 칼럼을 표시
+  sum(price) as amount -- price(가격)의 합계를 구함
+  from inlaid-lane-373607.sqlr202301.lec10_1 -- 데이터를 추출할 물리 테이블 선택
+  where dt between '2017-01-01' and '2017-01-31' --2017년 1월에 해당하는 데이터만 선택
+  group by category --카테고리별로 그룹화
+)
+--2) 항목별 매출의 구성비(각 데이터가 차지하는 비율)와 구성비누계(각 데이터가 차지하는 비율의 합계) 계산
+, sales_composition_ratio as (
+  select 
+  category,
+  amount,
+  -- 구성비 = 100 * (항목별매출/전체매출)
+  100.0 * amount / sum(amount) over() as composition_ratio,
+
+  -- 구성비누계 = 100 * (항목별 누적매출/전체매출)
+  100.0 * sum(amount) over(order by amount desc rows between unbounded preceding and current row) / sum(amount) over() as cumulative_ratio 
+
+  from monthly_sales
+)
+--3) 구성비누계에 따라 등급 부여하기
+select * , 
+case 
+when cumulative_ratio between 0 and 70 then 'A' -- 구성비누계가 0부터 70사이이면 A등급 부여
+when cumulative_ratio between 70 and 90 then 'B' -- 구성비누계가 70부터 90사이이면 B등급 부여
+when cumulative_ratio between 90 and 100 then 'C' -- 구성비누계가 90부터 100사이이면 C등급 부여
+END AS abc
+from sales_composition_ratio
+order by amount desc;
+
+
+--- 응용 ---
+--1) 항목별 매출 합계 계산
+with
+monthly_sales as (
+  select
+  name, 
+  sum(price) as amount
+  from inlaid-lane-373607.sqlr202301.sales_10
+  group by name 
+)
+--2) 항목별 매출의 구성비(각 데이터가 차지하는 비율)와 구성비누계(각 데이터가 차지하는 비율의 합계) 계산
+, sales_composition_ratio as (
+  select 
+  name,
+  amount,
+  100.0 * amount / sum(amount) over() as composition_ratio,
+  100.0 * sum(amount) over(order by amount desc rows between unbounded preceding and current row) / sum(amount) over() as cumulative_ratio 
+  from monthly_sales
+)
+--3) 구성비누계에 따라 등급 부여하기
+select * , 
+case 
+when cumulative_ratio between 0 and 70 then 'A' 
+when cumulative_ratio between 70 and 90 then 'B' 
+when cumulative_ratio between 90 and 100 then 'C' 
+END AS abc
+from sales_composition_ratio
+order by amount desc;
