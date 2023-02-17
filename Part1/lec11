@@ -224,3 +224,74 @@ count (distinct user_id) as user_count,
 from action_day_count_per_user
 group by action_day_count
 order by action_day_count;
+
+
+---------------------- 2) 벤다이어그램을 활용한 분석 -------------------------
+
+select * from inlaid-lane-373607.sqlr202301.lec11_5;
+
+---2-1) 액션 플래그 만들기 // 해당 액션을 했으면 1, 아니면 0을 부여하기
+with
+user_action_flag as(
+  select user_id,
+  sign(sum(case when action = 'heart' then 1 else 0 end)) as heart, 
+  sign(sum(case when action = 'chat' then 1 else 0 end)) as chat,
+  sign(sum(case when action = 'buy' then 1 else 0 end)) as buy
+  from inlaid-lane-373607.sqlr202301.lec11_5
+  group by user_id
+)
+select * from user_action_flag;
+
+--2-2) 모든 액션 조합에 따른 사용자 수 계산
+----참고) 계산가능한 모든 조합을 반환하는 cube()를 쓰면 훨씬 간편하나, 빅쿼리에서는 cube함수 사용이 불가하므로 다른 방법을 사용합니다.
+---- 결과 테이블에서 각 칼럼이 1/1/1일 경우 구매 시 모든 과정을 거쳤다는 의미입니다.
+with
+user_action_flag as(
+  select user_id,
+  sign(sum(case when action = 'heart' then 1 else 0 end)) as heart, 
+  sign(sum(case when action = 'chat' then 1 else 0 end)) as chat,
+  sign(sum(case when action = 'buy' then 1 else 0 end)) as buy
+  from inlaid-lane-373607.sqlr202301.lec11_5
+  group by user_id
+)
+, action_diagram as (
+  select act_heart, act_chat, act_buy, count(*) as users -- 해당 액션의 모든 경우로, 
+  from user_action_flag
+  cross join unnest(array[heart, null]) as act_heart --heart칼럼의 값이 없을 경우 액션을 했는지, 하지 않았는지 모르는 경우로, null로 표시
+  cross join unnest(array[chat, null]) as act_chat
+  cross join unnest(array[buy, null]) as act_buy
+  group by act_heart, act_chat, act_buy
+)
+select * from action_diagram
+order by act_heart, act_chat, act_buy;
+
+
+--2-3) 벤 다이어그램을 만들기
+with
+user_action_flag as(
+  select user_id,
+  sign(sum(case when action = 'heart' then 1 else 0 end)) as heart, 
+  sign(sum(case when action = 'chat' then 1 else 0 end)) as chat,
+  sign(sum(case when action = 'buy' then 1 else 0 end)) as buy
+  from inlaid-lane-373607.sqlr202301.lec11_5
+  group by user_id
+)
+, action_diagram as (
+  select act_heart, act_chat, act_buy, count(*) as users -- 해당 액션의 모든 경우로, 
+  from user_action_flag
+  cross join unnest(array[heart, null]) as act_heart --heart칼럼의 값이 없을 경우 액션을 했는지, 하지 않았는지 모르는 경우로, null로 표시
+  cross join unnest(array[chat, null]) as act_chat
+  cross join unnest(array[buy, null]) as act_buy
+  group by act_heart, act_chat, act_buy
+)
+--- 0과 1로 된 플래그를 문자로 변환하기.
+select
+case act_heart when 1 then 'heart' when 0 then 'not heart' else 'any' end as act_heart,
+case act_chat when 1 then 'chat' when 0 then 'not chat' else 'any' end as act_chat,
+case act_buy when 1 then 'buy' when 0 then 'not buy' else 'any' end as act_buy
+, users
+-- 전체 유저 대비 액션 이용의 비율 구하기
+, 100*users / nullif(sum(case when act_heart is null and act_chat is null and act_buy is null then users else 0 end) over(),0) as ratio
+from action_diagram
+order by act_heart, act_chat, act_buy;
+
