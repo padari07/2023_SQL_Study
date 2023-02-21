@@ -295,3 +295,76 @@ case act_buy when 1 then 'buy' when 0 then 'not buy' else 'any' end as act_buy
 from action_diagram
 order by act_heart, act_chat, act_buy;
 
+
+
+-----------------------3) decile분석 ------------------------
+--3-1) 구매액이 많은 순서로 사용자 그룹을 10등분하기
+with
+user_purchase_amount as(
+  select user_id,
+  sum(amount) as purchased_price
+  from inlaid-lane-373607.sqlr202301.lec11_6
+  group by user_id
+)
+, user_with_decile as(
+  select user_id, purchased_price, ntile(10) over (order by purchased_price desc) as decile
+  from user_purchase_amount
+)
+select * from user_with_decile;
+
+
+--3-2) 10분할한 decile들을 집계하기
+with
+user_purchase_amount as(
+  select user_id,
+  sum(amount) as purchased_price
+  from inlaid-lane-373607.sqlr202301.lec11_6
+  group by user_id
+)
+, user_with_decile as(
+  select user_id, purchased_price, ntile(10) over (order by purchased_price desc) as decile
+  from user_purchase_amount
+)
+, decile_amount as(
+  select decile
+  , sum(purchased_price) as amount --등급별 전체 금액
+  , avg(purchased_price) as avg_amount -- 등급별 평균금액
+  , sum(sum(purchased_price)) over (order by decile) as cumulative_amount --등급별 누계비
+  , sum(sum(purchased_price)) over() as total_amount --전체 금액 합계
+  from user_with_decile
+  group by decile
+)
+select * from decile_amount
+order by decile;
+
+
+--3-3) 구성비와 구성비누계 계산하기
+with
+user_purchase_amount as(
+  select user_id,
+  sum(amount) as purchased_price
+  from inlaid-lane-373607.sqlr202301.lec11_6
+  group by user_id
+)
+, user_with_decile as(
+  select user_id, purchased_price, ntile(10) over (order by purchased_price desc) as decile
+  from user_purchase_amount
+)
+, decile_amount as(
+  select decile
+  , sum(purchased_price) as amount --등급별 전체 금액
+  , avg(purchased_price) as avg_amount -- 등급별 평균금액
+  , sum(sum(purchased_price)) over (order by decile) as cumulative_amount --등급별 누계값
+  , sum(sum(purchased_price)) over() as total_amount --전체 금액 합계
+  from user_with_decile
+  group by decile
+)
+select decile, amount, avg_amount,
+100*amount / total_amount as total_ratio,
+100*cumulative_amount / total_amount as cumulative_ratio
+from decile_amount
+order by decile;
+
+select * from inlaid-lane-373607.sqlr202301.lec11_6
+;
+
