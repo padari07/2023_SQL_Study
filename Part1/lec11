@@ -368,3 +368,172 @@ order by decile;
 select * from inlaid-lane-373607.sqlr202301.lec11_6
 ;
 
+
+-----------------------4) RFM분석 ------------------------
+--4-1) 사용자별로 RFM을 집계하기
+WITH
+purchase_log as (
+  select user_id, amount, substr(cast(stamp as string),1,10) as dt
+  from inlaid-lane-373607.sqlr202301.lec11_6
+)
+, user_rfm as (
+  select user_id, max(dt) as recent_date, 
+  date_diff(current_date, date(timestamp(max(dt))), day) as recency,
+  count(dt) as frequency,
+  sum(amount) as monetary
+  from purchase_log
+  group by user_id
+)
+select * from user_rfm
+order by monetary desc;
+
+
+--4-2) 사용자들의 rfm랭크를 계산하기
+WITH
+purchase_log as (
+  select user_id, amount, substr(cast(stamp as string),1,10) as dt
+  from inlaid-lane-373607.sqlr202301.lec11_6
+)
+, user_rfm as (
+  select user_id, max(dt) as recent_date, 
+  date_diff(current_date, date(timestamp(max(dt))), day) as recency,
+  count(dt) as frequency,
+  sum(amount) as monetary
+  from purchase_log
+  group by user_id
+)
+, user_rfm_rank as (
+  select user_id, recent_date, recency, frequency, monetary,
+  case 
+  when recency < 70 then 5
+  when recency < 100 then 4
+  when recency < 150 then 3
+  when recency < 200 then 2
+  else 1 end as r
+  , case
+  when frequency >= 55 then 5
+  when frequency >= 45 then 4
+  when frequency >= 35 then 3
+  when frequency >= 25 then 2
+  else 1 end as f
+  , case
+  when 250000 <= monetary then 5
+  when 200000 <= monetary then 4
+  when 150000 <= monetary then 3
+  when 100000 <= monetary then 2
+  else 1 end as m
+  from user_rfm
+)
+, total_rfm as (
+  select user_id, recent_date, frequency, monetary, r, f, m, r+f+m as tot_rfm
+  from user_rfm_rank
+)
+select * from total_rfm
+WHERE tot_rfm = 10
+order by tot_rfm, user_id;
+
+
+--4-3) 각 그룹에 속한 사람의 수 확인하기
+WITH
+purchase_log as (
+  select user_id, amount, substr(cast(stamp as string),1,10) as dt
+  from inlaid-lane-373607.sqlr202301.lec11_6
+)
+, user_rfm as (
+  select user_id, max(dt) as recent_date, 
+  date_diff(current_date, date(timestamp(max(dt))), day) as recency,
+  count(dt) as frequency,
+  sum(amount) as monetary
+  from purchase_log
+  group by user_id
+)
+, user_rfm_rank as (
+  select user_id, recent_date, recency, frequency, monetary,
+  case 
+  when recency < 70 then 5
+  when recency < 100 then 4
+  when recency < 150 then 3
+  when recency < 200 then 2
+  else 1 end as r
+  , case
+  when frequency >= 55 then 5
+  when frequency >= 45 then 4
+  when frequency >= 35 then 3
+  when frequency >= 25 then 2
+  else 1 end as f
+  , case
+  when 250000 <= monetary then 5
+  when 200000 <= monetary then 4
+  when 150000 <= monetary then 3
+  when 100000 <= monetary then 2
+  else 1 end as m
+  from user_rfm
+)
+, mst_rfm_index as (
+  select 1 as rfm_index
+  union all
+  select 2 as rfm_index
+  union all
+  select 3 as rfm_index
+  union all
+  select 4 as rfm_index
+  union all
+  select 5 as rfm_index
+)
+, rfm_flag as (
+  select m.rfm_index,
+  case when m.rfm_index = r.r then 1 else 0 end as r_flag,
+  case when m.rfm_index = r.f then 1 else 0 end as f_flag,
+  case when m.rfm_index = r.m then 1 else 0 end as m_flag
+  from mst_rfm_index as m cross join user_rfm_rank as r
+)
+select rfm_index, sum(r_flag) as r, sum(f_flag) as f, sum(m_flag) as m
+from rfm_flag
+group by rfm_index
+order by rfm_index desc;
+
+
+--4-4) 사용자를 1차원으로 구분하기
+WITH
+purchase_log as (
+  select user_id, amount, substr(cast(stamp as string),1,10) as dt
+  from inlaid-lane-373607.sqlr202301.lec11_6
+)
+, user_rfm as (
+  select user_id, max(dt) as recent_date, 
+  date_diff(current_date, date(timestamp(max(dt))), day) as recency,
+  count(dt) as frequency,
+  sum(amount) as monetary
+  from purchase_log
+  group by user_id
+)
+, user_rfm_rank as (
+  select user_id, recent_date, recency, frequency, monetary,
+  case 
+  when recency < 70 then 5
+  when recency < 100 then 4
+  when recency < 150 then 3
+  when recency < 200 then 2
+  else 1 end as r
+  , case
+  when frequency >= 55 then 5
+  when frequency >= 45 then 4
+  when frequency >= 35 then 3
+  when frequency >= 25 then 2
+  else 1 end as f
+  , case
+  when 250000 <= monetary then 5
+  when 200000 <= monetary then 4
+  when 150000 <= monetary then 3
+  when 100000 <= monetary then 2
+  else 1 end as m
+  from user_rfm
+)
+select
+r + f + m as total_rank,
+count(user_id) as count
+from user_rfm_rank
+group by total_Rank
+order by total_rank desc;
+
+
